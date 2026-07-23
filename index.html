@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ClipHist — 轻量、快速的跨平台剪贴板历史管理器</title>
+<meta name="description" content="ClipHist 是一款基于 Tauri 2 的轻量、快速、完全本地运行的跨平台剪贴板历史管理器,支持 Windows、macOS 与 Linux。系统启动即常驻,随时呼出随时粘贴。" />
+<meta name="theme-color" content="#0F2B45" />
+<meta property="og:title" content="ClipHist — 跨平台剪贴板历史管理器" />
+<meta property="og:description" content="轻量、快速、完全本地运行。每一次复制,都值得被记住。" />
+<meta property="og:type" content="website" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%231E3A5F'/%3E%3Crect x='98' y='94' width='316' height='348' rx='44' fill='%23fff'/%3E%3Cpath d='M162 102C162 66 200 46 256 46C312 46 350 66 350 102' fill='none' stroke='%23fff' stroke-width='28' stroke-linecap='round'/%3E%3Ccircle cx='256' cy='290' r='88' fill='%23F8FAFC'/%3E%3Cpath d='M256 290L314 242' stroke='%23F59E0B' stroke-width='16' stroke-linecap='round'/%3E%3Cpath d='M256 290L224 248' stroke='%231E293B' stroke-width='20' stroke-linecap='round'/%3E%3C/svg%3E" />
+<style>
+/* ============================================================
+   ClipHist 推广站 — 单文件自包含
+   品牌色:深蓝渐变 #1E3A5F→#0F2B45, 琥珀强调 #F59E0B
+   ============================================================ */
+
+:root {
+  /* 深色品牌色板 */
+  --navy-900: #0B2237;
+  --navy-800: #0F2B45;
+  --navy-700: #1E3A5F;
+  --navy-600: #2A4D78;
+  --navy-500: #3B6A9C;
+
+  /* 强调色 */
+  --amber: #F59E0B;
+  --amber-deep: #D97706;
+  --amber-soft: #FCD34D;
+  --cyan: #3DAEE9;
+  --cyan-deep: #3498D6;
+
+  /* 浅色内容区 */
+  --paper: #FAFBFC;
+  --paper-2: #FFFFFF;
+  --ink-900: #0F2B45;
+  --ink-700: #2A3B50;
+  --ink-500: #5B6B7E;
+  --ink-400: #8696A7;
+  --line: #E7EBF0;
+  --line-2: #EEF2F6;
+
+  /* 分类色 (与 app 一致) */
+  --cat-all: #4F46E5;
+  --cat-image: #059669;
+  --cat-text: #2563EB;
+  --cat-link: #DC2626;
+  --cat-short: #7C3AED;
+  --cat-rich: #E11D48;
+
+  --shadow-sm: 0 1px 2px rgba(15, 43, 69, .06), 0 1px 3px rgba(15, 43, 69, .04);
+  --shadow-md: 0 8px 24px -8px rgba(15, 43, 69, .12), 0 4px 12px -4px rgba(15, 43, 69, .08);
+  --shadow-lg: 0 32px 64px -20px rgba(11, 34, 55, .35), 0 12px 28px -12px rgba(11, 34, 55, .22);
+  --shadow-window: 0 40px 80px -24px rgba(8, 28, 48, .55), 0 20px 40px -20px rgba(8, 28, 48, .4);
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-lg: 24px;
+
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --maxw: 1180px;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-900);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+a { color: inherit; text-decoration: none; }
+img, svg { display: block; max-width: 100%; }
+button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+::selection { background: var(--amber); color: #1A1206; }
+
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
+
+/* ---------- 通用工具 ---------- */
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--amber);
+}
+.eyebrow::before {
+  content: ""; width: 22px; height: 1.5px; background: var(--amber); border-radius: 2px;
+}
+.eyebrow.center::before { display: none; }
+.eyebrow.center { padding: 6px 14px; border: 1px solid rgba(245, 158, 11, .35); border-radius: 999px; background: rgba(245, 158, 11, .08); }
+
+.section-title {
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.section-sub {
+  margin-top: 16px;
+  font-size: 18px;
+  color: var(--ink-500);
+  max-width: 620px;
+}
+.on-dark .section-title { color: #fff; }
+.on-dark .section-sub { color: rgba(255, 255, 255, .72); }
+
+/* ============================================================
+   导航栏
+   ============================================================ */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  transition: background .3s var(--ease-smooth), backdrop-filter .3s, border-color .3s, box-shadow .3s;
+  border-bottom: 1px solid transparent;
+}
+.nav.scrolled {
+  background: rgba(11, 34, 55, .72);
+  backdrop-filter: saturate(160%) blur(16px);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
+  border-bottom-color: rgba(255, 255, 255, .08);
+}
+.nav-inner {
+  max-width: var(--maxw); margin: 0 auto; padding: 0 28px;
+  height: 64px; display: flex; align-items: center; justify-content: space-between;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark { width: 30px; height: 30px; flex-shrink: 0; }
+.brand-name { font-weight: 700; font-size: 18px; letter-spacing: -0.01em; color: #fff; }
+.nav-links { display: flex; align-items: center; gap: 8px; }
+.nav-links a {
+  color: rgba(255, 255, 255, .78); font-size: 14.5px; font-weight: 500;
+  padding: 8px 14px; border-radius: 8px; transition: color .2s, background .2s;
+}
+.nav-links a:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+.nav-cta { display: flex; align-items: center; gap: 10px; }
+.btn-ghost {
+  color: rgba(255, 255, 255, .85); font-size: 14px; font-weight: 600;
+  padding: 9px 16px; border-radius: 9px; border: 1px solid rgba(255, 255, 255, .16);
+  display: inline-flex; align-items: center; gap: 8px; transition: all .2s var(--ease-smooth);
+}
+.btn-ghost:hover { border-color: rgba(255, 255, 255, .36); background: rgba(255, 255, 255, .06); }
+.btn-ghost svg { width: 16px; height: 16px; }
+.nav-toggle { display: none; }
+
+/* ============================================================
+   按钮
+   ============================================================ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  font-size: 15px; font-weight: 600;
+  padding: 13px 22px; border-radius: 11px;
+  transition: transform .18s var(--ease-spring), box-shadow .2s, background .2s;
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px) scale(.99); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--amber) 0%, var(--amber-deep) 100%);
+  color: #1A1206;
+  box-shadow: 0 8px 20px -6px rgba(245, 158, 11, .5), inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -8px rgba(245, 158, 11, .6), inset 0 1px 0 rgba(255, 255, 255, .35); }
+.btn-light {
+  background: rgba(255, 255, 255, .1); color: #fff; border: 1px solid rgba(255, 255, 255, .22);
+  backdrop-filter: blur(8px);
+}
+.btn-light:hover { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .4); transform: translateY(-2px); }
+.btn-dark {
+  background: var(--navy-800); color: #fff;
+}
+.btn-dark:hover { background: var(--navy-700); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.btn svg { width: 18px; height: 18px; }
+
+/* ============================================================
+   Hero
+   ============================================================ */
+.hero {
+  position: relative; overflow: hidden;
+  background: radial-gradient(120% 100% at 80% -10%, var(--navy-700) 0%, var(--navy-800) 42%, var(--navy-900) 100%);
+  padding: 132px 0 96px;
+  color: #fff;
+}
+/* 网格 + 光晕 */
+.hero::before {
+  content: ""; position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: radial-gradient(80% 70% at 70% 20%, #000 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(80% 70% at 70% 20%, #000 30%, transparent 75%);
+  pointer-events: none;
+}
+.hero-glow {
+  position: absolute; pointer-events: none; border-radius: 50%; filter: blur(70px);
+}
+.glow-amber { width: 460px; height: 460px; right: -60px; top: -120px; background: radial-gradient(circle, rgba(245, 158, 11, .34), transparent 68%); }
+.glow-cyan { width: 380px; height: 380px; left: -80px; bottom: -140px; background: radial-gradient(circle, rgba(61, 174, 233, .26), transparent 68%); }
+
+.hero-grid {
+  position: relative; z-index: 2;
+  display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 7px 14px 7px 10px; border-radius: 999px;
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .14);
+  font-size: 13px; color: rgba(255, 255, 255, .85); font-weight: 500;
+  margin-bottom: 28px;
+}
+.hero-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: #34D399; box-shadow: 0 0 0 4px rgba(52, 211, 153, .18); }
+.hero-badge .pill { padding: 2px 8px; border-radius: 999px; background: rgba(245, 158, 11, .18); color: var(--amber-soft); font-size: 11px; font-weight: 600; }
+
+.hero h1 {
+  font-size: clamp(38px, 5.4vw, 64px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+.hero h1 .grad {
+  background: linear-gradient(120deg, var(--amber-soft) 0%, var(--amber) 50%, #FB923C 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+}
+.hero h1 .amp { color: var(--cyan); }
+.hero-lead {
+  margin-top: 22px; font-size: 19px; line-height: 1.7; color: rgba(255, 255, 255, .74);
+  max-width: 520px;
+}
+.hero-actions { margin-top: 36px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.hero-meta { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 22px; font-size: 13.5px; color: rgba(255, 255, 255, .6); }
+.hero-meta span { display: inline-flex; align-items: center; gap: 7px; }
+.hero-meta svg { width: 15px; height: 15px; color: var(--cyan); }
+
+/* ---------- 应用窗口 Mockup ---------- */
+.hero-visual { position: relative; perspective: 1800px; }
+.window-frame {
+  position: relative;
+  border-radius: 14px;
+  background: #fcfcfc;
+  box-shadow: var(--shadow-window);
+  transform: rotateY(-9deg) rotateX(3deg) translateZ(0);
+  transform-style: preserve-3d;
+  animation: floaty 7s ease-in-out infinite;
+  overflow: hidden;
+}
+@keyframes floaty {
+  0%, 100% { transform: rotateY(-9deg) rotateX(3deg) translateY(0); }
+  50% { transform: rotateY(-9deg) rotateX(3deg) translateY(-10px); }
+}
+.window-glow {
+  position: absolute; inset: -2px; border-radius: 16px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, .35), rgba(61, 174, 233, .25));
+  z-index: -1; filter: blur(18px); opacity: .7;
+}
+
+/* 标题栏 (OS 原生风格) */
+.w-titlebar {
+  display: flex; align-items: center; gap: 12px;
+  height: 38px; padding: 0 14px;
+  background: #ecedee;
+  border-bottom: 1px solid #dde0e2;
+  user-select: none;
+}
+.w-traffic { display: flex; gap: 8px; }
+.w-traffic .tl { width: 13px; height: 13px; border-radius: 50%; }
+.tl.close { background: #F0625A; }
+.tl.min { background: #F7BD4C; }
+.tl.max { background: #58C453; }
+.w-title { flex: 1; text-align: center; font-size: 12.5px; color: #5b6b7e; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.w-title svg { width: 14px; height: 14px; }
+
+.w-body { background: #eff0f1; }
+
+/* 分类标签 */
+.w-cats { display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 12px 0; }
+.w-cat {
+  padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  color: #4d4f52; background: #f1f2f3; transition: all .2s var(--ease-spring);
+}
+.w-cat.active { color: #fff; font-weight: 600; transform: scale(1.02); }
+
+/* 搜索框 */
+.w-search {
+  display: flex; align-items: center; gap: 8px;
+  margin: 10px 12px; padding: 8px 10px;
+  background: #fcfcfc; border: 1px solid #d5d7d8; border-radius: 6px;
+}
+.w-search svg { width: 15px; height: 15px; color: #76787d; flex-shrink: 0; }
+.w-search input {
+  border: none; outline: none; flex: 1; font-size: 12.5px; color: #232629;
+  background: transparent; min-width: 0;
+}
+.w-search input::placeholder { color: #9aa0a6; }
+
+/* 工具栏 */
+.w-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0 14px 8px; font-size: 11.5px; color: #76787d; }
+.w-count { font-weight: 500; }
+.w-cog { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; color: #76787d; transition: background .15s; }
+.w-cog:hover { background: #e4e4e4; }
+.w-cog svg { width: 14px; height: 14px; }
+
+/* 历史列表 */
+.w-list { padding: 0 6px 4px; max-height: 332px; overflow: hidden; }
+.w-item {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 9px 10px; margin: 0 6px 4px; border-radius: 7px;
+  transition: background .12s;
+  cursor: default;
+}
+.w-item:hover { background: #e9eaec; }
+.w-item.selected { background: #d9edf8; box-shadow: inset 0 0 0 1.5px var(--cyan); }
+.w-idx {
+  flex-shrink: 0; width: 19px; height: 19px; border-radius: 5px;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  color: #5b6b7e; background: #e4e6e8; margin-top: 1px;
+}
+.w-item.selected .w-idx { background: var(--cyan); color: #fff; }
+.w-item-main { flex: 1; min-width: 0; }
+.w-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.w-type {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600;
+  padding: 2px 7px; border-radius: 4px; color: #fff;
+}
+.w-type svg { width: 10px; height: 10px; }
+.w-time { font-size: 10.5px; color: #9aa0a6; margin-left: auto; }
+.w-actions { display: flex; gap: 4px; }
+.w-act { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; color: #76787d; transition: background .12s, color .12s; }
+.w-act:hover { background: #d8d9da; color: #232629; }
+.w-act.del:hover { color: #DC2626; }
+.w-act svg { width: 12px; height: 12px; }
+.w-item-content { font-size: 12.5px; color: #232629; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-item-content.link { color: var(--cat-link); }
+.w-thumb { width: 38px; height: 28px; border-radius: 4px; object-fit: cover; flex-shrink: 0; margin-top: 1px; background: linear-gradient(135deg, #a7d8f0, #6db8e0); display: grid; place-items: center; color: #fff; }
+.w-thumb svg { width: 16px; height: 16px; }
+
+/* 状态栏 */
+.w-statusbar {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 24px; padding: 0 12px; background: #fcfcfc; border-top: 1px solid #dde0e2;
+  font-size: 11px; color: #76787d;
+}
+.w-stat { display: flex; align-items: center; gap: 6px; }
+.w-stat .ld { width: 6px; height: 6px; border-radius: 50%; background: #34D399; }
+
+/* 浮动徽标 */
+.float-chip {
+  position: absolute; z-index: 3;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-radius: 11px;
+  background: rgba(255, 255, 255, .96); color: var(--ink-900);
+  font-size: 13px; font-weight: 600;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(8px);
+}
+.float-chip svg { width: 16px; height: 16px; }
+.chip-1 { top: 8%; left: -7%; animation: floaty2 6s ease-in-out infinite; }
+.chip-2 { bottom: 14%; right: -6%; animation: floaty2 6.5s ease-in-out infinite .8s; }
+.chip-1 svg { color: var(--amber); }
+.chip-2 svg { color: var(--cat-image); }
+@keyframes floaty2 {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* ============================================================
+   信任条
+   ============================================================ */
+.trust {
+  background: var(--navy-900);
+  padding: 34px 0;
+  border-top: 1px solid rgba(255, 255, 255, .06);
+}
+.trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+.trust-item { display: flex; align-items: center; gap: 14px; justify-content: center; }
+.trust-item svg { width: 26px; height: 26px; color: var(--amber); flex-shrink: 0; }
+.trust-item .t { font-size: 15px; font-weight: 600; color: #fff; line-height: 1.3; }
+.trust-item .s { font-size: 12.5px; color: rgba(255, 255, 255, .55); }
+
+/* ============================================================
+   通用 section
+   ============================================================ */
+.section { padding: 100px 0; }
+.section-head { margin-bottom: 56px; max-width: 680px; }
+.section-head.center { margin-inline: auto; text-align: center; }
+
+/* ============================================================
+   功能网格
+   ============================================================ */
+.feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.feat {
+  position: relative; padding: 28px; border-radius: var(--radius);
+  background: var(--paper-2); border: 1px solid var(--line);
+  transition: transform .25s var(--ease-spring), box-shadow .25s, border-color .25s;
+  overflow: hidden;
+}
+.feat::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--amber), var(--amber-deep));
+  transform: scaleX(0); transform-origin: left; transition: transform .3s var(--ease-spring);
+}
+.feat:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: transparent; }
+.feat:hover::before { transform: scaleX(1); }
+.feat-ic {
+  width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 18px;
+  background: linear-gradient(135deg, var(--navy-700), var(--navy-800)); color: var(--amber-soft);
+  box-shadow: 0 8px 18px -8px rgba(15, 43, 69, .4);
+}
+.feat-ic svg { width: 24px; height: 24px; }
+.feat h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; color: var(--ink-900); }
+.feat p { font-size: 14.5px; color: var(--ink-500); line-height: 1.65; }
+
+/* ============================================================
+   应用展示 (带标注)
+   ============================================================ */
+.showcase { background: linear-gradient(180deg, #F4F7FB 0%, var(--paper) 100%); }
+.show-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.show-mock { position: relative; }
+.show-mock .window-frame { transform: none; animation: none; }
+.show-mock .window-glow { opacity: .5; }
+
+.anno { list-style: none; }
+.anno li {
+  position: relative; padding: 18px 0 18px 44px; border-left: 2px solid var(--line);
+  margin-left: 10px;
+}
+.anno li::before {
+  content: ""; position: absolute; left: -7px; top: 26px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--paper); border: 2px solid var(--amber);
+}
+.anno .a-num { position: absolute; left: 10px; top: 18px; font-size: 12px; font-weight: 700; color: var(--amber-deep); }
+.anno h4 { font-size: 17px; font-weight: 700; margin-bottom: 5px; }
+.anno p { font-size: 14.5px; color: var(--ink-500); line-height: 1.6; }
+.anno li:hover { border-left-color: var(--amber); }
+.anno li:hover::before { background: var(--amber); }
+
+/* ============================================================
+   快捷键
+   ============================================================ */
+.keys-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 820px; }
+.key-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 22px; border-radius: var(--radius-sm);
+  background: var(--paper-2); border: 1px solid var(--line);
+  transition: border-color .2s, transform .2s;
+}
+.key-row:hover { border-color: var(--amber); transform: translateX(4px); }
+.key-row .desc { font-size: 15px; font-weight: 500; color: var(--ink-700); }
+.key-combo { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.kbd {
+  display: inline-grid; place-items: center;
+  min-width: 32px; height: 32px; padding: 0 9px;
+  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px; font-weight: 600; color: var(--ink-900);
+  background: linear-gradient(180deg, #fff, #f4f6f9);
+  border: 1px solid #d4dbe3; border-bottom-width: 2.5px; border-radius: 7px;
+  box-shadow: 0 1px 0 rgba(15, 43, 69, .04);
+}
+.kbd.accent { color: #fff; background: linear-gradient(180deg, var(--amber), var(--amber-deep)); border-color: var(--amber-deep); }
+.kbd.plus { min-width: 0; padding: 0; background: none; border: none; color: var(--ink-400); box-shadow: none; }
+
+/* ============================================================
+   下载
+   ============================================================ */
+.download { position: relative; overflow: hidden; background: var(--navy-900); color: #fff; }
+.download::before {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(90% 120% at 50% 0%, rgba(245, 158, 11, .12), transparent 55%);
+}
+.dl-grid { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.dl-card {
+  padding: 30px 26px; border-radius: var(--radius);
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1);
+  transition: transform .25s var(--ease-spring), background .25s, border-color .25s;
+}
+.dl-card:hover { transform: translateY(-5px); background: rgba(255, 255, 255, .07); border-color: rgba(245, 158, 11, .4); }
+.dl-ic { width: 52px; height: 52px; border-radius: 13px; display: grid; place-items: center; margin-bottom: 18px; background: rgba(255, 255, 255, .06); }
+.dl-ic svg { width: 28px; height: 28px; }
+.dl-card h3 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.dl-card .dl-sub { font-size: 13.5px; color: rgba(255, 255, 255, .6); margin-bottom: 18px; }
+.dl-formats { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 22px; }
+.dl-fmt {
+  font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px;
+  background: rgba(255, 255, 255, .07); color: rgba(255, 255, 255, .85);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+.dl-link {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14.5px; font-weight: 600; color: var(--amber-soft);
+  border-bottom: 1.5px solid transparent; transition: border-color .2s, gap .2s;
+}
+.dl-link:hover { border-color: var(--amber); gap: 12px; }
+.dl-link svg { width: 16px; height: 16px; }
+
+.dl-extra { position: relative; z-index: 2; margin-top: 40px; padding: 24px 28px; border-radius: var(--radius); background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.dl-extra .t { font-size: 15px; color: rgba(255, 255, 255, .85); }
+.dl-extra code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 13.5px; color: var(--amber-soft); background: rgba(0,0,0,.3); padding: 2px 7px; border-radius: 5px; }
+.copy-btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 7px; background: rgba(255, 255, 255, .08); color: #fff; font-size: 13px; font-weight: 600; transition: background .2s; }
+.copy-btn:hover { background: rgba(255, 255, 255, .16); }
+.copy-btn svg { width: 14px; height: 14px; }
+.copy-btn.done { background: rgba(52, 211, 153, .2); color: #34D399; }
+
+/* ============================================================
+   技术栈
+   ============================================================ */
+.stack-grid { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+.stack-chip {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 12px 20px; border-radius: 999px;
+  background: var(--paper-2); border: 1px solid var(--line);
+  font-size: 15px; font-weight: 600; color: var(--ink-700);
+  transition: transform .2s var(--ease-spring), box-shadow .2s, border-color .2s;
+}
+.stack-chip:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--cyan); }
+.stack-chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+
+/* ============================================================
+   最终 CTA
+   ============================================================ */
+.final-cta { padding: 90px 0; }
+.cta-box {
+  position: relative; overflow: hidden;
+  border-radius: var(--radius-lg);
+  padding: 64px 48px; text-align: center;
+  background: linear-gradient(135deg, var(--navy-800) 0%, var(--navy-700) 60%, #26384F 100%);
+  color: #fff;
+  box-shadow: var(--shadow-lg);
+}
+.cta-box::before {
+  content: ""; position: absolute; width: 420px; height: 420px; right: -120px; top: -180px;
+  background: radial-gradient(circle, rgba(245, 158, 11, .4), transparent 65%); border-radius: 50%;
+}
+.cta-box::after {
+  content: ""; position: absolute; width: 360px; height: 360px; left: -120px; bottom: -180px;
+  background: radial-gradient(circle, rgba(61, 174, 233, .32), transparent 65%); border-radius: 50%;
+}
+.cta-box > * { position: relative; z-index: 2; }
+.cta-box h2 { font-size: clamp(30px, 4vw, 44px); font-weight: 800; letter-spacing: -0.02em; }
+.cta-box p { margin-top: 16px; font-size: 18px; color: rgba(255, 255, 255, .75); max-width: 540px; margin-inline: auto; }
+.cta-box .hero-actions { justify-content: center; margin-top: 32px; }
+
+/* ============================================================
+   Footer
+   ============================================================ */
+.footer { background: var(--navy-900); color: rgba(255, 255, 255, .6); padding: 60px 0 36px; border-top: 1px solid rgba(255, 255, 255, .06); }
+.footer-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; flex-wrap: wrap; padding-bottom: 36px; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.footer-brand { max-width: 320px; }
+.footer-brand .brand { margin-bottom: 14px; }
+.footer-brand p { font-size: 14px; line-height: 1.65; color: rgba(255, 255, 255, .55); }
+.footer-links { display: flex; gap: 56px; flex-wrap: wrap; }
+.footer-col h5 { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 14px; letter-spacing: .04em; text-transform: uppercase; }
+.footer-col a { display: block; font-size: 14px; padding: 5px 0; color: rgba(255, 255, 255, .55); transition: color .2s; }
+.footer-col a:hover { color: var(--amber-soft); }
+.footer-bottom { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding-top: 28px; font-size: 13px; }
+.footer-bottom .made { display: flex; align-items: center; gap: 6px; }
+.footer-bottom .made svg { width: 14px; height: 14px; color: var(--amber); }
+
+/* ============================================================
+   滚动揭示动画
+   ============================================================ */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s var(--ease-spring), transform .7s var(--ease-spring); }
+.reveal.in { opacity: 1; transform: none; }
+.reveal.d1 { transition-delay: .08s; }
+.reveal.d2 { transition-delay: .16s; }
+.reveal.d3 { transition-delay: .24s; }
+.reveal.d4 { transition-delay: .32s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .reveal { opacity: 1; transform: none; }
+  html { scroll-behavior: auto; }
+}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+@media (max-width: 960px) {
+  .hero { padding: 116px 0 72px; }
+  .hero-grid { grid-template-columns: 1fr; gap: 48px; }
+  .hero-visual { max-width: 480px; margin: 0 auto; }
+  .hero-visual { order: -1; }
+  .trust-grid { grid-template-columns: repeat(2, 1fr); gap: 22px; }
+  .feat-grid { grid-template-columns: repeat(2, 1fr); }
+  .show-grid { grid-template-columns: 1fr; gap: 40px; }
+  .dl-grid { grid-template-columns: 1fr; }
+  .section { padding: 76px 0; }
+}
+
+@media (max-width: 640px) {
+  .wrap, .nav-inner { padding: 0 18px; }
+  .nav-links { display: none; position: absolute; top: 64px; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 4px; padding: 14px 18px 18px; background: rgba(11, 34, 55, .96); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255, 255, 255, .1); }
+  .nav-links.open { display: flex; }
+  .nav-links a { padding: 12px 14px; }
+  .nav-toggle { display: inline-flex; flex-direction: column; gap: 5px; padding: 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,.16); }
+  .nav-toggle span { width: 18px; height: 2px; background: #fff; border-radius: 2px; }
+  .feat-grid { grid-template-columns: 1fr; }
+  .keys-grid { grid-template-columns: 1fr; }
+  .hero h1 { font-size: 36px; }
+  .hero-lead { font-size: 17px; }
+  .cta-box { padding: 44px 24px; }
+  .float-chip { display: none; }
+  .section-title { font-size: 28px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================ 导航栏 ============================ -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand" aria-label="ClipHist">
+      <svg class="brand-mark" viewBox="0 0 512 512" aria-hidden="true">
+        <rect width="512" height="512" rx="112" fill="#1E3A5F"/>
+        <path d="M162 102C162 66 200 46 256 46C312 46 350 66 350 102" fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round"/>
+        <rect x="98" y="94" width="316" height="348" rx="44" fill="#fff"/>
+        <circle cx="256" cy="290" r="88" fill="#F8FAFC"/>
+        <path d="M256 290L224 248" stroke="#1E293B" stroke-width="20" stroke-linecap="round"/>
+        <path d="M256 290L314 242" stroke="#F59E0B" stroke-width="16" stroke-linecap="round"/>
+        <circle cx="256" cy="290" r="12" fill="#1E293B"/>
+      </svg>
+      <span class="brand-name">ClipHist</span>
+    </a>
+    <div class="nav-links" id="navLinks">
+      <a href="#features">功能</a>
+      <a href="#showcase">界面</a>
+      <a href="#shortcuts">快捷键</a>
+      <a href="#download">下载</a>
+      <a href="#stack">技术栈</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn-ghost" href="https://github.com/Wind134/cliphist" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+        GitHub
+      </a>
+      <a class="btn btn-primary" href="#download" style="padding:9px 18px;font-size:14px;">下载</a>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</nav>
+
+<!-- ============================ Hero ============================ -->
+<header class="hero" id="top">
+  <div class="hero-glow glow-amber"></div>
+  <div class="hero-glow glow-cyan"></div>
+  <div class="wrap">
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <div class="hero-badge reveal"><span class="dot"></span> 完全本地运行 · 不联网不上传 <span class="pill">v1.0</span></div>
+        <h1 class="reveal d1">每一次复制,<br><span class="grad">都值得被记住。</span></h1>
+        <p class="hero-lead reveal d2">ClipHist 是一款基于 <strong style="color:#fff">Tauri 2</strong> 的轻量、快速剪贴板历史管理器。系统启动即常驻后台,一键呼出、即时搜索、键盘直达——让每一次复制都触手可及。</p>
+        <div class="hero-actions reveal d3">
+          <a class="btn btn-primary" href="#download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l4-4m-4 4l-4-4"/><path d="M5 21h14"/></svg>
+            立即下载
+          </a>
+          <a class="btn btn-light" href="https://github.com/Wind134/cliphist" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+            查看源码
+          </a>
+        </div>
+        <div class="hero-meta reveal d4">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Windows · macOS · Linux</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> 开源免费</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> 安装包 &lt; 10MB</span>
+        </div>
+      </div>
+
+      <!-- 应用窗口 Mockup -->
+      <div class="hero-visual reveal d2">
+        <div class="window-glow"></div>
+        <div class="window-frame">
+          <div class="w-titlebar">
+            <div class="w-traffic"><span class="tl close"></span><span class="tl min"></span><span class="tl max"></span></div>
+            <div class="w-title">
+              <svg viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#1E3A5F"/><path d="M162 102C162 66 200 46 256 46C312 46 350 66 350 102" fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round"/><rect x="98" y="94" width="316" height="348" rx="44" fill="#fff"/><circle cx="256" cy="290" r="88" fill="#F8FAFC"/><path d="M256 290L314 242" stroke="#F59E0B" stroke-width="16" stroke-linecap="round"/><path d="M256 290L224 248" stroke="#1E293B" stroke-width="20" stroke-linecap="round"/></svg>
+              ClipHist
+            </div>
+            <div style="width:60px"></div>
+          </div>
+          <div class="w-body">
+            <div class="w-cats">
+              <span class="w-cat active" style="background:var(--cat-all)">全部</span>
+              <span class="w-cat">图片</span>
+              <span class="w-cat">文本</span>
+              <span class="w-cat">链接</span>
+              <span class="w-cat">短文本</span>
+              <span class="w-cat">富文本</span>
+            </div>
+            <div class="w-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" placeholder="搜索剪贴板历史..." readonly value="" />
+            </div>
+            <div class="w-toolbar">
+              <span class="w-count">12 条记录</span>
+              <div class="w-cog" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+            </div>
+            <div class="w-list">
+              <!-- 1 链接 -->
+              <div class="w-item selected">
+                <div class="w-idx">1</div>
+                <div class="w-item-main">
+                  <div class="w-item-head">
+                    <span class="w-type" style="background:var(--cat-link)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>链接</span>
+                    <span class="w-time">刚刚</span>
+                    <div class="w-actions"><span class="w-act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="w-act del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span></div>
+                  </div>
+                  <div class="w-item-content link">github.com/Wind134/cliphist</div>
+                </div>
+              </div>
+              <!-- 2 文本 -->
+              <div class="w-item">
+                <div class="w-idx">2</div>
+                <div class="w-item-main">
+                  <div class="w-item-head">
+                    <span class="w-type" style="background:var(--cat-text)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>文本</span>
+                    <span class="w-time">2 分钟前</span>
+                    <div class="w-actions"><span class="w-act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="w-act del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span></div>
+                  </div>
+                  <div class="w-item-content">const history = loadHistory(); history.search(query);</div>
+                </div>
+              </div>
+              <!-- 3 图片 -->
+              <div class="w-item">
+                <div class="w-idx">3</div>
+                <div class="w-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
+                <div class="w-item-main">
+                  <div class="w-item-head">
+                    <span class="w-type" style="background:var(--cat-image)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>图片</span>
+                    <span class="w-time">5 分钟前</span>
+                    <div class="w-actions"><span class="w-act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="w-act del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span></div>
+                  </div>
+                  <div class="w-item-content">截图_2026-07-19.png · 1280×720</div>
+                </div>
+              </div>
+              <!-- 4 短文本 -->
+              <div class="w-item">
+                <div class="w-idx">4</div>
+                <div class="w-item-main">
+                  <div class="w-item-head">
+                    <span class="w-type" style="background:var(--cat-short)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>短文本</span>
+                    <span class="w-time">12 分钟前</span>
+                    <div class="w-actions"><span class="w-act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="w-act del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span></div>
+                  </div>
+                  <div class="w-item-content">#3DAEE9</div>
+                </div>
+              </div>
+              <!-- 5 富文本 -->
+              <div class="w-item">
+                <div class="w-idx">5</div>
+                <div class="w-item-main">
+                  <div class="w-item-head">
+                    <span class="w-type" style="background:var(--cat-rich)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>富文本</span>
+                    <span class="w-time">1 小时前</span>
+                    <div class="w-actions"><span class="w-act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="w-act del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span></div>
+                  </div>
+                  <div class="w-item-content">会议纪要 · Q3 路线图与发布计划…</div>
+                </div>
+              </div>
+            </div>
+            <div class="w-statusbar">
+              <span class="w-stat"><span class="ld"></span>监听中</span>
+              <span>双击或 Enter 复制 · 1-9 快捷输入</span>
+            </div>
+          </div>
+        </div>
+        <div class="float-chip chip-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>已复制到剪贴板</div>
+        <div class="float-chip chip-2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Ctrl+Shift+V 呼出</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================ 信任条 ============================ -->
+<section class="trust">
+  <div class="wrap">
+    <div class="trust-grid">
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <div><div class="t">三大平台</div><div class="s">Windows · macOS · Linux</div></div>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div><div class="t">100% 本地</div><div class="s">不联网 · 不上传 · 不追踪</div></div>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6L9 17l-5-5"/></svg>
+        <div><div class="t">轻量极速</div><div class="s">安装包不到 10MB,秒级响应</div></div>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>
+        <div><div class="t">完全开源</div><div class="s">MIT · 源码托管于 GitHub</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 功能 ============================ -->
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">核心功能</span>
+      <h2 class="section-title">为高效而生,为隐私而存</h2>
+      <p class="section-sub">从底层剪贴板监听到键盘级的极速操作,每一处细节都经过打磨。</p>
+    </div>
+    <div class="feat-grid">
+      <article class="feat reveal">
+        <div class="feat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 14l2 2 4-4"/></svg></div>
+        <h3>实时监听</h3>
+        <p>后台静默监听剪贴板变化,自动记录文本与图片历史,无需手动保存,所见即所得。</p>
+      </article>
+      <article class="feat reveal d1">
+        <div class="feat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+        <h3>模糊搜索</h3>
+        <p>智能分类与即时模糊搜索,数千条历史也能瞬间定位。链接、文本、图片各归其位。</p>
+      </article>
+      <article class="feat reveal d2">
+        <div class="feat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="6" y2="8"/><line x1="10" y1="8" x2="10" y2="8"/><line x1="14" y1="8" x2="14" y2="8"/><line x1="18" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="6" y1="16" x2="12" y2="16"/></svg></div>
+        <h3>全局快捷键</h3>
+        <p>一键呼出 / 隐藏窗口,全程键盘导航。1–9 数字键直接快速粘贴,手不离键盘。</p>
+      </article>
+      <article class="feat reveal">
+        <div class="feat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+        <h3>本地持久化</h3>
+        <p>JSON 文件原子写入,图片外置独立存储、按需加载。重启不丢数据,告别云端依赖。</p>
+      </article>
+      <article class="feat reveal d1">
+        <div class="feat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+        <h3>托盘常驻</h3>
+        <p>系统托盘常驻后台,可选开机自启与静默启动,始终待命却不打扰你的工作流。</p>
+      </article>
+      <article class="feat reveal d2">
+        <div class="feat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <h3>隐私优先</h3>
+        <p>完全本地运行,不联网、不上传、不追踪。你的剪贴板历史只属于你自己。</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 应用展示 ============================ -->
+<section class="section showcase on-dark" id="showcase">
+  <div class="wrap">
+    <div class="show-grid">
+      <div class="show-mock reveal">
+        <div class="window-glow"></div>
+        <div class="window-frame">
+          <div class="w-titlebar">
+            <div class="w-traffic"><span class="tl close"></span><span class="tl min"></span><span class="tl max"></span></div>
+            <div class="w-title">ClipHist</div>
+            <div style="width:60px"></div>
+          </div>
+          <div class="w-body">
+            <div class="w-cats">
+              <span class="w-cat active" style="background:var(--cat-all)">全部</span>
+              <span class="w-cat">图片</span>
+              <span class="w-cat">文本</span>
+              <span class="w-cat" style="background:var(--cat-link)">链接</span>
+              <span class="w-cat">短文本</span>
+              <span class="w-cat">富文本</span>
+            </div>
+            <div class="w-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" placeholder="搜索剪贴板历史..." value="github" />
+            </div>
+            <div class="w-toolbar">
+              <span class="w-count">已筛选 2 条</span>
+              <div class="w-cog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3m0 16v3M4.2 4.2l2.1 2.1m11.4 11.4l2.1 2.1M1 12h3m16 0h3M4.2 19.8l2.1-2.1m11.4-11.4l2.1-2.1"/></svg></div>
+            </div>
+            <div class="w-list">
+              <div class="w-item selected">
+                <div class="w-idx">1</div>
+                <div class="w-item-main">
+                  <div class="w-item-head">
+                    <span class="w-type" style="background:var(--cat-link)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>链接</span>
+                    <span class="w-time">刚刚</span>
+                    <div class="w-actions"><span class="w-act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="w-act del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span></div>
+                  </div>
+                  <div class="w-item-content link">github.com/Wind134/cliphist</div>
+                </div>
+              </div>
+              <div class="w-item">
+                <div class="w-idx">2</div>
+                <div class="w-item-main">
+                  <div class="w-item-head">
+                    <span class="w-type" style="background:var(--cat-text)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>文本</span>
+                    <span class="w-time">8 分钟前</span>
+                    <div class="w-actions"><span class="w-act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="w-act del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span></div>
+                  </div>
+                  <div class="w-item-content">git clone github.com/Wind134/cliphist.git</div>
+                </div>
+              </div>
+              <div class="w-item">
+                <div class="w-idx">3</div>
+                <div class="w-item-main">
+                  <div class="w-item-head">
+                    <span class="w-type" style="background:var(--cat-text)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>文本</span>
+                    <span class="w-time">23 分钟前</span>
+                    <div class="w-actions"><span class="w-act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="w-act del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span></div>
+                  </div>
+                  <div class="w-item-content">cd cliphist &amp;&amp; npm install</div>
+                </div>
+              </div>
+            </div>
+            <div class="w-statusbar">
+              <span class="w-stat"><span class="ld"></span>监听中</span>
+              <span>↑/↓ 导航 · Enter 复制</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="show-text">
+        <div class="section-head reveal" style="margin-bottom:0">
+          <span class="eyebrow">界面一览</span>
+          <h2 class="section-title">一眼看清,一步到位</h2>
+          <p class="section-sub">分类、搜索、导航、粘贴——四步并作一步,键鼠皆可,直觉即操作。</p>
+        </div>
+        <ol class="anno reveal d1">
+          <li><span class="a-num">01</span><h4>彩色分类标签</h4><p>六类内容(全部 / 图片 / 文本 / 链接 / 短文本 / 富文本)各以独立色彩标识,筛选只需一点。</p></li>
+          <li><span class="a-num">02</span><h4>即时模糊搜索</h4><p>边输入边筛选,结果实时更新,数千条历史也能在毫秒间收敛到你想要的那一条。</p></li>
+          <li><span class="a-num">03</span><h4>序号 + 键盘导航</h4><p>每条记录自带 1–9 序号,按数字键直接快速粘贴;↑/↓ 浏览,Enter 复制。</p></li>
+          <li><span class="a-num">04</span><h4>状态栏实时反馈</h4><p>底部状态栏显示监听状态与操作提示,所见即所控。</p></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 快捷键 ============================ -->
+<section class="section" id="shortcuts">
+  <div class="wrap">
+    <div class="section-head center reveal">
+      <span class="eyebrow center">键盘至上</span>
+      <h2 class="section-title">手不离键盘,全程丝滑</h2>
+      <p class="section-sub" style="margin-inline:auto">所有操作皆可键盘完成,呼出、搜索、导航、粘贴一气呵成。</p>
+    </div>
+    <div class="keys-grid" style="margin-inline:auto">
+      <div class="key-row reveal"><span class="desc">呼出 / 隐藏窗口(可在设置中修改)</span><span class="key-combo"><span class="kbd">Ctrl</span><span class="kbd plus">+</span><span class="kbd">Shift</span><span class="kbd plus">+</span><span class="kbd accent">V</span></span></div>
+      <div class="key-row reveal d1"><span class="desc">列表上下导航</span><span class="key-combo"><span class="kbd">↑</span><span class="kbd plus">/</span><span class="kbd">↓</span></span></div>
+      <div class="key-row reveal d2"><span class="desc">复制选中项到剪贴板</span><span class="key-combo"><span class="kbd accent">Enter</span></span></div>
+      <div class="key-row reveal"><span class="desc">数字键快速粘贴并置顶该条</span><span class="key-combo"><span class="kbd accent">1</span><span class="kbd plus">–</span><span class="kbd accent">9</span></span></div>
+      <div class="key-row reveal d1"><span class="desc">取消搜索 / 关闭窗口</span><span class="key-combo"><span class="kbd">Esc</span></span></div>
+      <div class="key-row reveal d2"><span class="desc">鼠标快速复制</span><span class="key-combo"><span class="kbd" style="font-size:11px">双击</span></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 下载 ============================ -->
+<section class="section download" id="download">
+  <div class="wrap">
+    <div class="section-head center on-dark reveal" style="margin-bottom:48px">
+      <span class="eyebrow center">立即开始</span>
+      <h2 class="section-title">为你的平台下载 ClipHist</h2>
+      <p class="section-sub" style="margin-inline:auto">所有安装包均来自 GitHub Releases,开源可验证。</p>
+    </div>
+    <div class="dl-grid">
+      <article class="dl-card reveal">
+        <div class="dl-ic" style="color:#3DAEE9"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5l8-2v18l-8-2V5z"/><path d="M21 5l-8-2v18l8-2V5z"/><path d="M3 5l8-2M21 5l-8-2M3 19l8 2M21 19l-8 2"/></svg></div>
+        <h3>Windows</h3>
+        <p class="dl-sub">Windows 10 及以上,64 位</p>
+        <div class="dl-formats"><span class="dl-fmt">.msi</span><span class="dl-fmt">.exe</span></div>
+        <a class="dl-link" href="https://github.com/Wind134/cliphist/releases" target="_blank" rel="noopener">前往下载 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+      </article>
+      <article class="dl-card reveal d1">
+        <div class="dl-ic" style="color:#fff"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.7 17.3c-.9 1.9-2.1 3.7-3.8 3.7-1.6 0-2.1-1-3.9-1-1.8 0-2.4 1-3.9 1-1.7 0-3-1.7-3.9-3.6C1 14.5 1.5 9.7 4 9c1.8-.5 2.8.5 4 .5 1.1 0 1.9-.5 3.4-.5 1.4 0 2.6.8 3.5 1.7-3 1.8-2.5 6 .3 7.3l-.5.3zM12.3 6.6c.5-.6.9-1.5.8-2.4-.8 0-1.7.5-2.2 1.2-.5.6-.9 1.5-.8 2.4.8 0 1.7-.5 2.2-1.2z"/></svg></div>
+        <h3>macOS</h3>
+        <p class="dl-sub">Intel 与 Apple Silicon</p>
+        <div class="dl-formats"><span class="dl-fmt">.dmg (Intel)</span><span class="dl-fmt">.dmg (ARM)</span></div>
+        <a class="dl-link" href="https://github.com/Wind134/cliphist/releases" target="_blank" rel="noopener">前往下载 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+      </article>
+      <article class="dl-card reveal d2">
+        <div class="dl-ic" style="color:#F59E0B"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L3 7v6c0 5 3.8 9.4 9 11 5.2-1.6 9-6 9-11V7l-9-5z"/><path d="M12 2L3 7v6c0 5 3.8 9.4 9 11 5.2-1.6 9-6 9-11V7l-9-5z" fill="none" stroke="#0F2B45" stroke-width="1.5"/></svg></div>
+        <h3>Linux</h3>
+        <p class="dl-sub">主流发行版通用</p>
+        <div class="dl-formats"><span class="dl-fmt">.deb</span><span class="dl-fmt">.AppImage</span></div>
+        <a class="dl-link" href="https://github.com/Wind134/cliphist/releases" target="_blank" rel="noopener">前往下载 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+      </article>
+    </div>
+    <div class="dl-extra reveal">
+      <div class="t">Arch 用户可通过 AUR 安装:<code>cliphist</code> / <code>cliphist-bin</code></div>
+      <button class="copy-btn" id="copyAur" data-cmd="yay -S cliphist-bin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>复制命令</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 技术栈 ============================ -->
+<section class="section" id="stack" style="padding-top:80px">
+  <div class="wrap">
+    <div class="section-head center reveal" style="margin-bottom:40px">
+      <span class="eyebrow center">技术栈</span>
+      <h2 class="section-title">小而美的现代架构</h2>
+      <p class="section-sub" style="margin-inline:auto">Rust 后端负责性能与系统底层,Svelte 5 前端负责轻快体验,Tauri 2 把两者优雅缝合。</p>
+    </div>
+    <div class="stack-grid reveal d1">
+      <span class="stack-chip"><span class="dot" style="background:#FFC131"></span>Tauri 2</span>
+      <span class="stack-chip"><span class="dot" style="background:#DEA584"></span>Rust</span>
+      <span class="stack-chip"><span class="dot" style="background:#FF3E00"></span>Svelte 5</span>
+      <span class="stack-chip"><span class="dot" style="background:#3178C6"></span>TypeScript</span>
+      <span class="stack-chip"><span class="dot" style="background:#6E9CDD"></span>arboard</span>
+      <span class="stack-chip"><span class="dot" style="background:var(--cat-image)"></span>JSON 原子存储</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 最终 CTA ============================ -->
+<section class="final-cta">
+  <div class="wrap">
+    <div class="cta-box reveal">
+      <span class="eyebrow center" style="margin-bottom:18px">马上体验</span>
+      <h2>让剪贴板,记住你的每一次灵感</h2>
+      <p>下载安装,设置开机自启,从此告别"我刚才复制了什么"的尴尬瞬间。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#download">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l4-4m-4 4l-4-4"/><path d="M5 21h14"/></svg>
+          免费下载
+        </a>
+        <a class="btn btn-light" href="https://github.com/Wind134/cliphist" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ Footer ============================ -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a href="#top" class="brand">
+          <svg class="brand-mark" viewBox="0 0 512 512" aria-hidden="true">
+            <rect width="512" height="512" rx="112" fill="#1E3A5F"/>
+            <path d="M162 102C162 66 200 46 256 46C312 46 350 66 350 102" fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round"/>
+            <rect x="98" y="94" width="316" height="348" rx="44" fill="#fff"/>
+            <circle cx="256" cy="290" r="88" fill="#F8FAFC"/>
+            <path d="M256 290L314 242" stroke="#F59E0B" stroke-width="16" stroke-linecap="round"/>
+            <path d="M256 290L224 248" stroke="#1E293B" stroke-width="20" stroke-linecap="round"/>
+          </svg>
+          <span class="brand-name">ClipHist</span>
+        </a>
+        <p>轻量、快速、完全本地运行的跨平台剪贴板历史管理器。每一次复制,都值得被记住。</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h5>产品</h5>
+          <a href="#features">功能特性</a>
+          <a href="#showcase">界面预览</a>
+          <a href="#shortcuts">快捷键</a>
+          <a href="#download">下载</a>
+        </div>
+        <div class="footer-col">
+          <h5>资源</h5>
+          <a href="https://github.com/Wind134/cliphist" target="_blank" rel="noopener">GitHub 仓库</a>
+          <a href="https://github.com/Wind134/cliphist/releases" target="_blank" rel="noopener">发布版本</a>
+          <a href="https://github.com/Wind134/cliphist/issues" target="_blank" rel="noopener">问题反馈</a>
+        </div>
+        <div class="footer-col">
+          <h5>开发</h5>
+          <a href="https://github.com/Wind134/cliphist#开发编译" target="_blank" rel="noopener">本地编译</a>
+          <a href="https://github.com/Wind134/cliphist/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener">架构文档</a>
+          <a href="https://github.com/Wind134/cliphist/blob/main/docs/migration-notes.md" target="_blank" rel="noopener">迁移说明</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 ClipHist · 基于 Tauri 2 · MIT 协议开源</span>
+      <span class="made">用 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9.5-9C1 9 2.5 5.5 6 5.5c2 0 3 1 4 2.5C11 6.5 12 5.5 14 5.5c3.5 0 5 3.5 3.5 6.5C19 16.5 12 21 12 21z"/></svg> 与 Rust 打造</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* 导航栏滚动效果 + 移动菜单 */
+(function () {
+  var nav = document.getElementById('nav');
+  var links = document.getElementById('navLinks');
+  var toggle = document.getElementById('navToggle');
+  function onScroll() {
+    if (window.scrollY > 24) nav.classList.add('scrolled');
+    else nav.classList.remove('scrolled');
+  }
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+  toggle.addEventListener('click', function () { links.classList.toggle('open'); });
+  links.querySelectorAll('a').forEach(function (a) {
+    a.addEventListener('click', function () { links.classList.remove('open'); });
+  });
+})();
+
+/* 滚动揭示 */
+(function () {
+  var els = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) {
+    els.forEach(function (el) { el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+  els.forEach(function (el) { io.observe(el); });
+})();
+
+/* 复制 AUR 命令 */
+(function () {
+  var btn = document.getElementById('copyAur');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var cmd = btn.getAttribute('data-cmd');
+    var done = function () {
+      btn.classList.add('done');
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>已复制';
+      setTimeout(function () {
+        btn.classList.remove('done');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>复制命令';
+      }, 1800);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cmd).then(done).catch(fallback);
+    } else { fallback(); }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = cmd; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+})();
+
+/* 平滑滚动偏移修正(固定导航栏) */
+document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+  a.addEventListener('click', function (e) {
+    var id = a.getAttribute('href');
+    if (id.length <= 1) return;
+    var t = document.querySelector(id);
+    if (!t) return;
+    e.preventDefault();
+    var y = t.getBoundingClientRect().top + window.scrollY - 64;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  });
+});
+</script>
+</body>
+</html>
